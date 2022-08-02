@@ -8,11 +8,8 @@ import numpy as np
 from astropy.stats import sigma_clip
 from lmfit import Model
 from ppxf import ppxf
-from multiprocessing import cpu_count
-from functools import partial
 import matplotlib.pyplot as plt
 from astropy.stats import median_absolute_deviation as MAD
-import logging
 import dask
 
 

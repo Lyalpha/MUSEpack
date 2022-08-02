@@ -5,38 +5,20 @@ __version__ = "1.1"
 
 __revision__ = "20210128"
 
-import sys
-import os
-import shutil
 import warnings
-import pyspeckit
-import pickle
-import numpy as np
-from astropy.io import ascii
-from astropy.table import Table
-from astropy.table import Column
-from astropy import units as u
-from astropy import constants as const
-from astropy import log
-from astropy.stats import median_absolute_deviation as MAD
-from astropy.stats import sigma_clip
-import matplotlib.pyplot as plt
+from multiprocessing.pool import Pool
+
 import matplotlib.gridspec as gridspec
 from matplotlib.ticker import FormatStrFormatter
 import pandas as pd
 from multiprocessing import cpu_count
-from functools import partial
-from scipy.special import wofz
 from ppxf import ppxf
 from ppxf import ppxf_util
-import dask
 import time
 import logging
-from scipy.ndimage.filters import gaussian_filter
 
 """ internal modules"""
 from MUSEpack.ppxf_MC import ppxf_MC
-from MUSEpack.utils import *
 from MUSEpack.line_fitter import *
 
 

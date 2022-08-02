@@ -2,19 +2,9 @@ __version__ = "1.0.1"
 
 __revision__ = "20210128"
 
-import sys
-import os
-import shutil
-import warnings
 import pyspeckit
-import numpy as np
 from astropy import units as u
 from astropy import log
-from matplotlib.ticker import FormatStrFormatter
-import pandas as pd
-from scipy.special import wofz
-import time
-import logging
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 from MUSEpack.utils import *
