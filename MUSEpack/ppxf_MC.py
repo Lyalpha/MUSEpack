@@ -4,13 +4,14 @@ __version__ = "0.1.1"
 
 __revision__ = "20190731"
 
+from multiprocessing.pool import Pool
+
 import numpy as np
 from astropy.stats import sigma_clip
 from lmfit import Model
 from ppxf import ppxf
 import matplotlib.pyplot as plt
 from astropy.stats import median_absolute_deviation as MAD
-import dask
 
 
 def ppxf_MC(
@@ -96,10 +97,8 @@ def ppxf_MC(
     if goodpixels.any() == None:
         goodpixels = np.arange(len(log_spec_f))
 
-    iter_spec = log_spec_f.copy()
-
-    results = [
-        dask.delayed(_ppxf_bootstrap)(
+    star_args = [
+        (
             log_template_f,
             log_spec_f,
             log_spec_err,
@@ -109,18 +108,13 @@ def ppxf_MC(
             guesses,
             moments,
             vsyst,
-            iter_spec,
             noise,
             RV_guess_var,
-        )
-        for n in np.arange(nrand)
-    ]
+        ),
+    ] * nrand
 
-    if n_CPU == 1:
-        uncert_ppxf = dask.compute(*results, num_workers=1, scheduler="single-threaded")
-
-    if n_CPU > 0:
-        uncert_ppxf = dask.compute(*results, num_workers=n_CPU, scheduler="processes")
+    with Pool(n_CPU) as pool:
+        uncert_ppxf = pool.starmap(_ppxf_bootstrap, star_args)
 
     clipped = sigma_clip(np.array(uncert_ppxf)[:, 0], sigma=sigma, stdfunc=MAD)
     clipped = clipped.data[~clipped.mask]
@@ -134,14 +128,11 @@ def ppxf_MC(
         )
 
         popt = [result.best_values["a"], result.best_values["b"], result.best_values["c"]]
-
-    if spec_id:
+    else:
         plt.figure(spec_id)
         ret = plt.hist(clipped, bins=int(20), density=True, label="n\ realizations: " + str(nrand))
 
         bins = [ret[1][i] + 0.5 * (ret[1][i + 1] - ret[1][i]) for i in range(len(ret[0]))]
-
-        binlength = bins[1] - bins[0]
 
         result = Model(_gaussian_fit).fit(
             ret[0], x=bins, a=np.max(ret[0]), b=np.mean(clipped), c=np.std(clipped)
@@ -149,7 +140,7 @@ def ppxf_MC(
 
         popt = [result.best_values["a"], result.best_values["b"], result.best_values["c"]]
 
-        x = ((np.arange(20000 * len(bins)) - 10000 * len(bins)) / (100 * len(bins))) + popt[1]
+        x = ((np.arange(2000 * len(bins)) - 1000 * len(bins)) / (100 * len(bins))) + popt[1]
 
         plt.plot(x, _gaussian_fit(x, *popt), lw=3)
         plt.axvline(
@@ -173,7 +164,7 @@ def ppxf_MC(
         plt.ylabel(r"relative number")
         plt.legend()
         plt.tight_layout()
-        plt.savefig(spec_id + "_v_dist.png", dpi=600)
+        plt.savefig(spec_id + "_v_dist.png", dpi=100)
         plt.close()
 
     return popt[1], popt[2]
@@ -189,7 +180,6 @@ def _ppxf_bootstrap(
     guesses,
     moments,
     vsyst,
-    iter_spec,
     noise,
     RV_guess_var,
 ):
@@ -231,31 +221,21 @@ def _ppxf_bootstrap(
             A systematic velocity. This may be needed if the system move at
             high velocities compared to the rest frame. If the guess of vsyst
             is good, the fit runs faster and more stable.
-
-        iterspec: :func:`numpy.array`
-            a copy of log_template_f that can be manipulated in each step
-
         noise: :func:`numpy.array`
             constant error spectrum
 
     """
-
-    pm = np.random.randint(1, 3, size=len(log_spec_err))
-    pm[np.where(pm == 2)] = -1
-    pm_log_spec_err = pm * log_spec_err
-
-    np.random.seed()
-    scramble = goodpixels[(np.random.rand(len(goodpixels)) * len(goodpixels)).astype(int)]
-
-    new_log_spec_err = pm_log_spec_err[scramble]
-    iter_spec[goodpixels] = log_spec_f[goodpixels] + new_log_spec_err
+    log_spec_f = log_spec_f.copy()
+    log_spec_f[goodpixels] = (
+        log_spec_f[goodpixels] + np.random.normal(size=len(goodpixels)) * log_spec_err[goodpixels]
+    )
 
     rv_var = np.random.uniform(-1.0, 1.0) * RV_guess_var
     var_guesses = [sum(x) for x in zip(guesses, [rv_var, 0.0])]
 
     pp1 = ppxf.ppxf(
         log_template_f,
-        iter_spec,
+        log_spec_f,
         noise,
         velscale,
         var_guesses,
@@ -272,7 +252,7 @@ def _ppxf_bootstrap(
 
     if moments <= 2:
         uncert = np.array([pp1.sol[0], pp1.sol[1]])
-    if moments > 2:
+    else:
         uncert = np.array([pp1.sol[0], pp1.sol[1], pp1.sol[2], pp1.sol[3]])
 
     return uncert

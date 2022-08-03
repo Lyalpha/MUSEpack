@@ -518,8 +518,8 @@ class RV_spectrum:
             n_CPU = cpu_count()
         self.logger.info("Max number of cores: " + str(n_CPU))
 
-        result = [
-            dask.delayed(line_fitter)(
+        star_args = [
+            (
                 self,
                 input_cat,
                 ldx,
@@ -537,14 +537,10 @@ class RV_spectrum:
             )
             for ldx in np.array(line_idxs)
         ]
-
-        if self.loglevel == "DEBUG":
-            results = dask.compute(*result, num_workers=1, scheduler="single-threaded")
-        if not self.loglevel == "DEBUG":
-            results = dask.compute(*result, num_workers=n_CPU, scheduler="processes")
+        with Pool(n_CPU) as pool:
+            results = pool.starmap(line_fitter, star_args)
 
         for result in results:
-
             if not result[13]:
                 self.template_f[result[5]] = result[6][result[5]]
                 self.fit_f[result[5]] = result[11][result[5]]
@@ -720,6 +716,7 @@ class RV_spectrum:
 
         v = np.zeros_like(l_lab)
         ev = np.zeros_like(l_lab)
+        pp_outliers_init = None
 
         for i, line in enumerate(l_lab):
 
@@ -767,7 +764,7 @@ class RV_spectrum:
                     log_spec_err,
                     velscale_spec,
                     guesses,
-                    nrand=0.5 * niter,
+                    nrand=int(0.5 * niter),
                     goodpixels=pp_outliers_init.goodpixels,
                     degree=-1,
                     moments=2,
@@ -841,8 +838,7 @@ class RV_spectrum:
                     quiet=True,
                     fixed=[0, 1],
                 )
-
-            if len(l_lab) == 1:
+            else:
                 pp_final_init = pp_outliers_init
             # pp_final_init.plot()
             # # plt.tight_layout()
