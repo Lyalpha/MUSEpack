@@ -140,7 +140,7 @@ def ppxf_MC(
 
         popt = [result.best_values["a"], result.best_values["b"], result.best_values["c"]]
 
-        x = ((np.arange(2000 * len(bins)) - 1000 * len(bins)) / (100 * len(bins))) + popt[1]
+        x = np.linspace(popt[1] - 4 * popt[2], popt[1] + 4 * popt[2], 500)
 
         plt.plot(x, _gaussian_fit(x, *popt), lw=3)
         plt.axvline(
